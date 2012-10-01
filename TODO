@@ -1,0 +1,6 @@
+Should probably start with domain instead of zone and divine zone from a
+type NS lookup on domain, and update the remaining name against and into
+the zone.
+
+e.g. foo.bar.example.com, NS lookup reveals example.com zone, update
+"foo.bar" into the example.com zone.
