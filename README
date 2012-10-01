@@ -1,0 +1,11 @@
+dnsupdate was written to use TSIG dns keys. It should be updated to
+tolerate shared secrets if that doesn't already happen to work.
+
+dnsupdate tries to be quite intelligent with the defaults, getting
+hostname and domainname from the host and updating to the NS server for
+domainname as returned by a dns query. As indicated in the '-h' output,
+a well configured host will likely only need the key option and nothing
+else to make the update.
+
+Depends on dig, nsupdate, curl, as well as some pretty standard unix
+stuff (bash, cat, etc)
