@@ -1,0 +1,146 @@
+#! /bin/bash -e
+
+TTL=600
+FORCE=
+IPREG="\([0-9]\+\.\)\{3\}[0-9]\+"
+DNSREG="\([0-9a-z][0-9a-z-]\{0,63\}\.\)*[0-9a-z][0-9a-z-]\{0,63\}"
+
+function defaults {
+  ZONE=${ZONE:-$(domainname)}
+  if [ "${ZONE}" -a "${ZONE}" != "(none)" ]; then
+    SERVER=${SERVER:-$(dig +short -t NS "${ZONE}" | head -n 1)}
+    DOMAIN=${DOMAIN:-${ZONE}}
+  else
+    ZONE=
+  fi
+  RECORD=${RECORD:-$(hostname -s).${DOMAIN}}
+  VALUE=${VALUE:-$(curl -s icanhazip.com)}
+
+  # figure the record type if not specified
+  if [ ! "${TYPE}" ]; then
+    if echo "${VALUE}" | grep -q -e "^${IPREG}$"; then
+      TYPE=A
+    elif echo "${VALUE}" | grep -q -e "^${DNSREG}$" && [ "${#VALUE}" -lt 256 ]; then
+      TYPE=CNAME
+    else
+      TYPE=TXT
+    fi
+  fi
+}
+
+function usage {
+  defaults
+  PAD="
+                  "
+  fmt -s <<EOF
+usage: dnskeyupdate [options] keyfile [zone]
+  -d domain     domain to use in the record${ZONE:+${PAD}[${ZONE}]}
+  -s server     dns server to update to${ZONE:+${PAD}[${SERVER}]}
+  -t TTL        ttl for new record
+                  [${TTL}]
+  -x            delete specified record before updating (or just delete if
+                  no value given, e.g. -v "")
+                  note that you must give a type when deleting with -v "",
+                  because type will be assumed to be TXT since value won't
+                  be a valid ip address or domain name.
+  -T type       record type, defaults to A if value is an ip address,
+                  CNAME if it contains a valid DNS name, otherwise TXT${TYPE:+${PAD}[${TYPE}]}
+  -r record     the record name to update (default is hostname)${RECORD:+${PAD}[${RECORD}]}
+  -v value      override the value (defaults to \`icanhazip\`)${VALUE:+${PAD}[${VALUE}]}
+  -f            don't check first, update even if the records already
+                  match
+  keyfile       the file with the private DNSSEC key, the only required
+                  option on a well configured host
+  zone          zone to update record in, defaults to \`domainname\`
+                  $([ "${ZONE}" ] && echo "[${ZONE}]" || echo "(required, you don't have a domain name configured)")
+
+If type is a CNAME, the A record (if present) is deleted as well as any existing CNAME before adding the new CNAME record. Likewise if the type is A then both CNAME and A are deleted if present before updating.
+
+zone is set to \`domainname\` by default. domain defaults to zone, and server defaults to the NS record for zone.
+EOF
+  exit $1
+}
+
+function summary {
+  defaults
+  for p in ZONE SERVER TTL TYPE RECORD VALUE; do
+    echo "${p}=${!p}"
+  done
+}
+
+# bonafide options
+while [ $# -gt 0 ]; do
+  case $1 in
+    -d) DOMAIN=$2; shift;;
+    -s) SERVER=$2; shift;;
+    -t) TTL=$2; shift;;
+    -x) DELETE=1;;
+    -T) TYPE=$2; shift;;
+    -r) RECORD=$2; shift;;
+    -v) VALUE=$2; shift;;
+    -f) FORCE=1;;
+    -n) DUMMY=1;;
+    -h) HELP=0;;
+    --show) SUMMARY=1;;
+    -*) HELP=1; set -- ; break;;
+    *) break;;
+  esac
+  shift
+done
+
+KEY=$1
+ZONE=$2
+
+if [ "${HELP}" ]; then
+  [ "${HELP}" -eq 1 ] && echo "Invalid option encountered"
+  usage "${HELP}"
+fi
+
+if [ "${SUMMARY}" ]; then
+  summary
+  exit
+fi
+
+defaults
+
+# check if we need to change anything
+# there should only be an A or a CNAME, not both
+if [ "${TYPE}" = "A" -o "${TYPE}" = "CNAME" ]; then
+  A_RECORD=$(dig "@${SERVER}" -t A "${RECORD}" +short)
+  CNAME_RECORD=$(dig "@${SERVER}" -t CNAME "${RECORD}" +short)
+  if [ "${A_RECORD}" -a "${CNAME_RECORD}" ]; then
+    [ "${A_RECORD}" ] && DELETES=(CNAME) || DELETES=(A)
+  fi
+fi
+
+# check value
+if [ ! "${FORCE}" -a ! "${DELETES}" ]; then
+  MY_RECORD=${TYPE}_RECORD
+  MY_RECORD=${!MY_RECORD:-$(dig "@${SERVER}" -t ${TYPE} +short "${RECORD}")}
+  MY_VALUE=${VALUE}
+  # ensure a trailing . for CNAME value
+  [ "${TYPE}" = CNAME ] && MY_VALUE=${MY_VALUE%.}.
+  if echo "${MY_RECORD}" | grep "^${MY_VALUE}$" > /dev/null ; then
+    exit 0
+  fi
+fi
+[ "${DELETE}" ] && DELETES=("${DELETES[@]}" "${TYPE}")
+
+function submit {
+  if [ ! "${DUMMY}" ]; then
+    tee /dev/stderr | nsupdate ${KEY:+-k "${KEY}"} -v
+  else
+    cat
+  fi
+}
+
+cat <<EOF | submit
+server ${SERVER}
+zone ${ZONE}
+$(for t in "${DELETES[@]}"; do
+  echo update delete ${RECORD} ${t}
+done)
+update add ${RECORD} ${TTL} ${TYPE} ${VALUE}
+show
+send
+EOF
