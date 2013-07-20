@@ -146,6 +146,8 @@ fi
 # check value
 if [ ! "${FORCE}" -a ! "${DELETES}" ]; then
   MY_RECORD=${TYPE}_RECORD
+  # !MY_RECORD is an indirect reference, to take advantage of
+  # records already fetched in the previous step
   MY_RECORD=${!MY_RECORD:-$(dig "@${SERVER}" -t ${TYPE} +short "${RECORD}")}
   MY_VALUE=${VALUE}
   if echo "${MY_RECORD}" | grep "^${MY_VALUE}$" > /dev/null ; then
@@ -155,21 +157,19 @@ if [ ! "${FORCE}" -a ! "${DELETES}" ]; then
 fi
 [ "${DELETE}" ] && DELETES=("${DELETES[@]}" "${TYPE}")
 
-function submit {
-  if [ ! "${DUMMY}" ]; then
-    tee /dev/stderr | nsupdate ${KEY:+-k "${KEY}"} -v
-  else
-    cat
-  fi
+function nsupdate_text {
+  echo "server ${SERVER}"
+  echo "zone ${ZONE}"
+  for t in "${DELETES[@]}"; do
+    echo "update delete ${RECORD} ${t}"
+  done
+  [ "${VALUE}" ] && echo "update add ${RECORD} ${TTL} ${TYPE} ${VALUE}"
+  echo show
+  echo send
 }
 
-cat <<EOF | submit
-server ${SERVER}
-zone ${ZONE}
-$(for t in "${DELETES[@]}"; do
-  echo update delete ${RECORD} ${t}
-done)
-update add ${RECORD} ${TTL} ${TYPE} ${VALUE}
-show
-send
-EOF
+if [ ! "${DUMMY}" ]; then
+  nsupdate_text | tee /dev/stderr | nsupdate ${KEY:+-k "${KEY}"} -v
+else
+  nsupdate_text
+fi
