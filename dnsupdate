@@ -3,7 +3,7 @@
 TTL=600
 FORCE=
 IPREG="\([0-9]\+\.\)\{3\}[0-9]\+"
-DNSREG="\([0-9a-z][0-9a-z-]\{0,63\}\.\)*[0-9a-z][0-9a-z-]\{0,63\}"
+DNSREG="\([0-9a-z][0-9a-z-]\{0,63\}\.\)*[0-9a-z][0-9a-z-]\{0,63\}.\?"
 
 function defaults {
   ZONE=${ZONE:-$(domainname)}
