@@ -6,7 +6,7 @@ IPREG="\([0-9]\+\.\)\{3\}[0-9]\+"
 DNSREG="\([0-9a-z][0-9a-z-]\{0,63\}\.\)*[0-9a-z][0-9a-z-]\{0,63\}.\?"
 
 function defaults {
-  ZONE=${ZONE:-$(domainname)}
+  ZONE=${ZONE:-$(dnsdomainname)}
   if [ "${ZONE}" -a "${ZONE}" != "(none)" ]; then
     SERVER=${SERVER:-$(dig +short -t NS "${ZONE}" | head -n 1)}
     DOMAIN=${DOMAIN:-${ZONE}}
@@ -54,12 +54,12 @@ usage: dnskeyupdate [options] keyfile [zone]
                   or specified in the options)
   keyfile       the file with the private DNSSEC key, the only required
                   option on a well configured host
-  zone          zone to update record in, defaults to \`domainname\`
+  zone          zone to update record in, defaults to \`dnsdomainname\`
                   $([ "${ZONE}" ] && echo "[${ZONE}]" || echo "(required, you don't have a domain name configured)")
 
 If type is a CNAME, the A record (if present) is deleted as well as any existing CNAME before adding the new CNAME record. Likewise if the type is A then both CNAME and A are deleted if present before updating.
 
-zone is set to \`domainname\` by default. domain defaults to zone, and server defaults to the NS record for zone.
+zone is set to \`dnsdomainname\` by default. domain defaults to zone, and server defaults to the NS record for zone.
 EOF
   exit $1
 }
