@@ -5,6 +5,12 @@ FORCE=
 IPREG="\([0-9]\+\.\)\{3\}[0-9]\+"
 DNSREG="\([0-9a-z][0-9a-z-]\{0,63\}\.\)*[0-9a-z][0-9a-z-]\{0,63\}.\?"
 
+function fqdn {
+  local D=$1
+  [ "${D%.}" = "$D" ] && D="${D}.${2%.}."
+  echo -n "$D"
+}
+
 function defaults {
   ZONE=${ZONE:-$(dnsdomainname)}
   if [ "${ZONE}" -a "${ZONE}" != "(none)" ]; then
@@ -13,7 +19,9 @@ function defaults {
   else
     ZONE=
   fi
-  RECORD=${RECORD:-$(hostname -s).${DOMAIN}}
+  RECORD=${RECORD:-$(hostname -s)}
+  # make it fully qualified (add $DOMAIN)
+  RECORD=$(fqdn "$RECORD" "$DOMAIN")
   VALUE=${VALUE:-$(curl -s icanhazip.com)}
 
   # figure the record type if not specified
@@ -22,6 +30,8 @@ function defaults {
       TYPE=A
     elif echo "${VALUE}" | grep -q -e "^${DNSREG}$" && [ "${#VALUE}" -lt 256 ]; then
       TYPE=CNAME
+      # make it fully qualified (add $ZONE)
+      VALUE=$(fqdn "$VALUE" "$ZONE")
     else
       TYPE=TXT
     fi
@@ -45,8 +55,11 @@ usage: dnskeyupdate [options] keyfile [zone]
                   be a valid ip address or domain name.
   -T type       record type, defaults to A if value is an ip address,
                   CNAME if it contains a valid DNS name, otherwise TXT${TYPE:+${PAD}[${TYPE}]}
-  -r record     the record name to update (default is hostname)${RECORD:+${PAD}[${RECORD}]}
-  -v value      override the value (defaults to \`icanhazip\`)${VALUE:+${PAD}[${VALUE}]}
+  -r record     the record name to update (default is hostname)
+                  '${DOMAIN}' (-d option) is added if not fully qualified${RECORD:+${PAD}[${RECORD}]}
+  -v value      override the value (defaults to \`icanhazip\`)
+                  if value is a CNAME and not fully qualified, adds
+                  '${ZONE}' (zone parameter)${VALUE:+${PAD}[${VALUE}]}
   -f            don't check first, update even if the records already
                   match
   -n            don't do any updates, just print out the nsupdate commands
@@ -121,8 +134,6 @@ if [ ! "${FORCE}" -a ! "${DELETES}" ]; then
   MY_RECORD=${TYPE}_RECORD
   MY_RECORD=${!MY_RECORD:-$(dig "@${SERVER}" -t ${TYPE} +short "${RECORD}")}
   MY_VALUE=${VALUE}
-  # ensure a trailing . for CNAME value
-  [ "${TYPE}" = CNAME ] && MY_VALUE=${MY_VALUE%.}.
   if echo "${MY_RECORD}" | grep "^${MY_VALUE}$" > /dev/null ; then
     exit 0
   fi
