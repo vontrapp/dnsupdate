@@ -49,6 +49,9 @@ usage: dnskeyupdate [options] keyfile [zone]
   -v value      override the value (defaults to \`icanhazip\`)${VALUE:+${PAD}[${VALUE}]}
   -f            don't check first, update even if the records already
                   match
+  -n            don't do any updates, just print out the nsupdate commands
+  --show        show the values that would be used for an update (defaults
+                  or specified in the options)
   keyfile       the file with the private DNSSEC key, the only required
                   option on a well configured host
   zone          zone to update record in, defaults to \`domainname\`
