@@ -34,8 +34,8 @@ function usage {
                   "
   fmt -s <<EOF
 usage: dnskeyupdate [options] keyfile [zone]
-  -d domain     domain to use in the record${ZONE:+${PAD}[${ZONE}]}
-  -s server     dns server to update to${ZONE:+${PAD}[${SERVER}]}
+  -d domain     domain to use in the record${DOMAIN:+${PAD}[${DOMAIN}]}
+  -s server     dns server to update to${SERVER:+${PAD}[${SERVER}]}
   -t TTL        ttl for new record
                   [${TTL}]
   -x            delete specified record before updating (or just delete if
