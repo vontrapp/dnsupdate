@@ -99,28 +99,30 @@ function summary {
 # bonafide options
 while [ $# -gt 0 ]; do
   case $1 in
-    -d) DOMAIN=$2; shift;;
-    -s) SERVER=$2; shift;;
-    -t) TTL=$2; shift;;
-    -x) DELETE=1;;
-    -T) TYPE=$2; shift;;
-    -r) RECORD=$2; shift;;
-    -v) VALUE=$2; shift;;
-    -f) FORCE=1;;
-    -n) DUMMY=1;;
-    -h) HELP=0;;
-    --show) SUMMARY=1;;
-    -*) HELP=1; set -- ; break;;
-    *) break;;
+    -d) DOMAIN=$2; shift 2;;
+    -s) SERVER=$2; shift 2;;
+    -t) TTL=$2; shift 2;;
+    -x) DELETE=1; shift;;
+    -T) TYPE=$2; shift 2;;
+    -r) RECORD=$2; shift 2;;
+    -v) VALUE=$2; VALUE_GIVEN=1; shift 2;;
+    -f) FORCE=1; shift;;
+    -n) DUMMY=1; shift;;
+    -h) HELP=0; shift;;
+    --show) SUMMARY=1; shift;;
+    -*) HELP=1; BADOPT=$1; set -- ; break;;
+    *) OTHERARGS=("${OTHERARGS[@]}" "$1"); shift;;
+    --) shift; break;;
   esac
-  shift
 done
 
-KEY=$1
-ZONE=$2
+set -- "${OTHERARGS[@]}" "$@"
+
+KEY=${1:-$KEY}
+ZONE=${2:-$ZONE}
 
 if [ "${HELP}" ]; then
-  [ "${HELP}" -eq 1 ] && echo "Invalid option encountered"
+  [ "${HELP}" -eq 1 ] && echo "$0: Invalid option encountered: $BADOPT"
   usage "${HELP}"
 fi
 
@@ -147,6 +149,7 @@ if [ ! "${FORCE}" -a ! "${DELETES}" ]; then
   MY_RECORD=${!MY_RECORD:-$(dig "@${SERVER}" -t ${TYPE} +short "${RECORD}")}
   MY_VALUE=${VALUE}
   if echo "${MY_RECORD}" | grep "^${MY_VALUE}$" > /dev/null ; then
+    [ -t 1 ] && echo "Already up to date, exiting. ($MY_RECORD from $SERVER)"
     exit 0
   fi
 fi
