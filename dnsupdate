@@ -14,8 +14,20 @@ function fqdn {
 function defaults {
   ZONE=${ZONE:-$(dnsdomainname)}
   if [ "${ZONE}" -a "${ZONE}" != "(none)" ]; then
-    SERVER=${SERVER:-$(dig +short -t NS "${ZONE}" | head -n 1)}
     DOMAIN=${DOMAIN:-${ZONE}}
+    if [ ! "${SERVER}" ]; then
+      _SERVER=$(dig +short -t NS "${ZONE}")
+      if [ "$(echo "$_SERVER" | wc -l)" -gt 1 ]; then
+        # it's usually not the case that multiple servers
+        # can handle dynamic updates, but we would get
+        # a random server
+        # let's hope that $ZONE resolves to the host that
+        # can handle updates
+        SERVER=$ZONE
+      else
+        SERVER=$_SERVER
+      fi
+    fi
   else
     ZONE=
   fi
