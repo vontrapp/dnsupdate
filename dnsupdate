@@ -1,5 +1,6 @@
 #! /bin/bash -e
 
+declare -a DELETES
 TTL=600
 FORCE=
 IPREG="\([0-9]\+\.\)\{3\}[0-9]\+"
@@ -34,7 +35,7 @@ function defaults {
   RECORD=${RECORD:-$(hostname -s)}
   # make it fully qualified (add $DOMAIN)
   RECORD=$(fqdn "$RECORD" "$DOMAIN")
-  VALUE=${VALUE:-$(curl -s icanhazip.com)}
+  [ ! "${VALUE_GIVEN}" ] && VALUE=$(curl -s icanhazip.com)
 
   # figure the record type if not specified
   if [ ! "${TYPE}" ]; then
@@ -50,6 +51,16 @@ function defaults {
   fi
 }
 
+function uniq_args {
+
+  FIRST=1
+  for el in "$@"; do
+    printf "%q" "$el"
+    [ $FIRST -eq 0 ] && echo
+    FIRST=0
+  done
+}
+
 function usage {
   defaults
   PAD="
@@ -60,11 +71,10 @@ usage: dnskeyupdate [options] keyfile [zone]
   -s server     dns server to update to${SERVER:+${PAD}[${SERVER}]}
   -t TTL        ttl for new record
                   [${TTL}]
-  -x            delete specified record before updating (or just delete if
-                  no value given, e.g. -v "")
-                  note that you must give a type when deleting with -v "",
-                  because type will be assumed to be TXT since value won't
-                  be a valid ip address or domain name.
+  -x type       delete record of type, if type is ANY then all records
+                  under '${RECORD}' (-r option) will be deleted.
+                  Can be specified multiple times, each specified type
+                  will be deleted.
   -T type       record type, defaults to A if value is an ip address,
                   CNAME if it contains a valid DNS name, otherwise TXT${TYPE:+${PAD}[${TYPE}]}
   -r record     the record name to update (default is hostname)
@@ -102,7 +112,7 @@ while [ $# -gt 0 ]; do
     -d) DOMAIN=$2; shift 2;;
     -s) SERVER=$2; shift 2;;
     -t) TTL=$2; shift 2;;
-    -x) DELETE=1; shift;;
+    -x) DELETES=("${DELETES[@]}" "$2"); VALUE=; VALUE_GIVEN=1; shift 2;;
     -T) TYPE=$2; shift 2;;
     -r) RECORD=$2; shift 2;;
     -v) VALUE=$2; VALUE_GIVEN=1; shift 2;;
@@ -138,13 +148,16 @@ defaults
 if [ "${TYPE}" = "A" -o "${TYPE}" = "CNAME" ]; then
   A_RECORD=$(dig "@${SERVER}" -t A "${RECORD}" +short)
   CNAME_RECORD=$(dig "@${SERVER}" -t CNAME "${RECORD}" +short)
-  if [ "${A_RECORD}" -a "${CNAME_RECORD}" ]; then
-    [ "${A_RECORD}" ] && DELETES=(CNAME) || DELETES=(A)
+  if [ "${A_RECORD}" -a "${TYPE}" = "CNAME" ]; then
+    [ "$( echo "${A_RECORD}" | wc -l)" -lt 2 ] &&
+    DELETES=("${DELETES[@]}" A)
+  elif [ "${CNAME_RECORD}" -a "${TYPE}" = "A" ]; then
+    DELETES=("${DELETES[@]}" CNAME)
   fi
 fi
 
 # check value
-if [ ! "${FORCE}" -a ! "${DELETES}" ]; then
+if [ ! "${FORCE}" -a "${#DELETES[@]}" -eq 0 ]; then
   MY_RECORD=${TYPE}_RECORD
   # !MY_RECORD is an indirect reference, to take advantage of
   # records already fetched in the previous step
@@ -155,7 +168,8 @@ if [ ! "${FORCE}" -a ! "${DELETES}" ]; then
     exit 0
   fi
 fi
-[ "${DELETE}" ] && DELETES=("${DELETES[@]}" "${TYPE}")
+# remove duplicates
+eval DELETES=($(uniq_args "${DELETES[@]}"))
 
 function nsupdate_text {
   echo "server ${SERVER}"
