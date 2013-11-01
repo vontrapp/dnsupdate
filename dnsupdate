@@ -35,7 +35,7 @@ function defaults {
   RECORD=${RECORD:-$(hostname -s)}
   # make it fully qualified (add $DOMAIN)
   RECORD=$(fqdn "$RECORD" "$DOMAIN")
-  [ ! "${VALUE_GIVEN}" ] && VALUE=$(curl -s icanhazip.com)
+  [ ! "${VALUE_GIVEN}" ] && VALUE=$(curl -s icanhazip.com) || :
 
   # figure the record type if not specified
   if [ ! "${TYPE}" ]; then
@@ -87,14 +87,20 @@ usage: dnskeyupdate [options] keyfile [zone]
   -n            don't do any updates, just print out the nsupdate commands
   --show        show the values that would be used for an update (defaults
                   or specified in the options)
-  keyfile       the file with the private DNSSEC key, the only required
+  [-k ]keyfile  the file with the private DNSSEC key, the only required
                   option on a well configured host
-  zone          zone to update record in, defaults to \`dnsdomainname\`
+  [-z ]zone     zone to update record in, defaults to \`dnsdomainname\`
                   $([ "${ZONE}" ] && echo "[${ZONE}]" || echo "(required, you don't have a domain name configured)")
 
-If type is a CNAME, the A record (if present) is deleted as well as any existing CNAME before adding the new CNAME record. Likewise if the type is A then both CNAME and A are deleted if present before updating.
+If type is a CNAME, the A record (if present) is deleted as well as any existing \
+CNAME before adding the new CNAME record. Likewise if the type is A then both \
+CNAME and A are deleted if present before updating.
 
-zone is set to \`dnsdomainname\` by default. domain defaults to zone, and server defaults to the NS record for zone.
+zone is set to \`dnsdomainname\` by default. domain defaults to zone, and server \
+defaults to the NS record for zone.
+
+If specifying zone without the -z flag, you also have to specify key without the \
+-k flag. Using the flags lets you place them anywhere in the arguments list.
 EOF
   exit $1
 }
@@ -118,6 +124,8 @@ while [ $# -gt 0 ]; do
     -v) VALUE=$2; VALUE_GIVEN=1; shift 2;;
     -f) FORCE=1; shift;;
     -n) DUMMY=1; shift;;
+    -k) KEY=$2; shift 2;;
+    -z) ZONE=$2; shift 2;;
     -h) HELP=0; shift;;
     --show) SUMMARY=1; shift;;
     -*) HELP=1; BADOPT=$1; set -- ; break;;
