@@ -153,14 +153,27 @@ defaults
 
 # check if we need to change anything
 # there should only be an A or a CNAME, not both
-if [ "${TYPE}" = "A" -o "${TYPE}" = "CNAME" ]; then
+if [ "${TYPE}" = "A" -o "${TYPE}" = "CNAME" -o "${TYPE}" = "AAAA" ]; then
   A_RECORD=$(dig "@${SERVER}" -t A "${RECORD}" +short)
+  AAAA_RECORD=$(dig "@${SERVER}" -t AAAA "${RECORD}" +short)
   CNAME_RECORD=$(dig "@${SERVER}" -t CNAME "${RECORD}" +short)
-  if [ "${A_RECORD}" -a "${TYPE}" = "CNAME" ]; then
-    [ "$( echo "${A_RECORD}" | wc -l)" -lt 2 ] &&
+  if [ "${TYPE}" = "CNAME" ]; then
+    [ "${A_RECORD}" ] &&
     DELETES=("${DELETES[@]}" A)
-  elif [ "${CNAME_RECORD}" -a "${TYPE}" = "A" ]; then
+    [ "${AAAA_RECORD}" ] &&
+    DELETES=("${DELETES[@]}" AAAA)
+    [ "${CNAME_RECORD}" ] &&
     DELETES=("${DELETES[@]}" CNAME)
+  elif [ "${TYPE}" = "A" ]; then
+    [ "${CNAME_RECORD}" ] &&
+    DELETES=("${DELETES[@]}" CNAME)
+    [ "${A_RECORD}" ] &&
+    DELETES=("${DELETES[@]}" A)
+  elif [ "${TYPE}" = "AAAA" ]; then
+    [ "${CNAME_RECORD}" ] &&
+    DELETES=("${DELETES[@]}" CNAME)
+    [ "${AAAA_RECORD}" ] &&
+    DELETES=("${DELETES[@]}" AAAA)
   fi
 fi
 
