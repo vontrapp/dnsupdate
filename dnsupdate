@@ -152,6 +152,19 @@ fi
 defaults
 
 # check if we need to change anything
+# check value
+if [ ! "${FORCE}" -a "${#DELETES[@]}" -eq 0 ]; then
+  MY_RECORD=${TYPE}_RECORD
+  # !MY_RECORD is an indirect reference, to take advantage of
+  # records already fetched in the previous step
+  MY_RECORD=${!MY_RECORD:-$(dig "@${SERVER}" -t ${TYPE} +short "${RECORD}")}
+  MY_VALUE=${VALUE}
+  if echo "${MY_RECORD}" | grep "^${MY_VALUE}$" > /dev/null ; then
+    [ -t 1 ] && echo "Already up to date, exiting. ($MY_RECORD from $SERVER)"
+    exit 0
+  fi
+fi
+
 # there should only be an A or a CNAME, not both
 if [ "${TYPE}" = "A" -o "${TYPE}" = "CNAME" -o "${TYPE}" = "AAAA" ]; then
   A_RECORD=$(dig "@${SERVER}" -t A "${RECORD}" +short)
@@ -177,18 +190,6 @@ if [ "${TYPE}" = "A" -o "${TYPE}" = "CNAME" -o "${TYPE}" = "AAAA" ]; then
   fi
 fi
 
-# check value
-if [ ! "${FORCE}" -a "${#DELETES[@]}" -eq 0 ]; then
-  MY_RECORD=${TYPE}_RECORD
-  # !MY_RECORD is an indirect reference, to take advantage of
-  # records already fetched in the previous step
-  MY_RECORD=${!MY_RECORD:-$(dig "@${SERVER}" -t ${TYPE} +short "${RECORD}")}
-  MY_VALUE=${VALUE}
-  if echo "${MY_RECORD}" | grep "^${MY_VALUE}$" > /dev/null ; then
-    [ -t 1 ] && echo "Already up to date, exiting. ($MY_RECORD from $SERVER)"
-    exit 0
-  fi
-fi
 # remove duplicates
 eval DELETES=($(uniq_args "${DELETES[@]}"))
 
