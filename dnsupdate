@@ -55,8 +55,8 @@ function uniq_args {
 
   FIRST=1
   for el in "$@"; do
-    printf "%q" "$el"
     [ $FIRST -eq 0 ] && echo
+    printf "%q" "$el"
     FIRST=0
   done
 }
