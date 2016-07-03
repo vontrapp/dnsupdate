@@ -198,7 +198,13 @@ function nsupdate_text {
   for t in "${DELETES[@]}"; do
     echo "update delete ${RECORD} ${t}"
   done
-  [ "${VALUE}" ] && echo "update add ${RECORD} ${TTL} ${TYPE} ${VALUE}"
+  if [ "${VALUE}" ]; then
+    if [ "${TYPE}" = "TXT" ]; then
+      echo "update add ${RECORD} ${TTL} ${TYPE} \"${VALUE}\""
+    else
+      echo "update add ${RECORD} ${TTL} ${TYPE} ${VALUE}"
+    fi
+  fi
   echo show
   echo send
 }
